@@ -159,44 +159,150 @@ PW5 = 1/5;
 
 % 5.- Análisis pixel por pixel de imagen, segmentando de acuerdo con valores
 %máximos de probabilidad a posteriori:
-for x = 1:sz(1)
-    % Process each pixel in the image for segmentation
-    for y = 1:sz(2)
-        pixelValue = I(x, y, :);
-        % calculando pWi_X para cada pixel
-        pW1_X = pX_W1(pixelValue)*PW1;
-        pW2_X = pX_W2(pixelValue)*PW2;
-        pW3_X = pX_W3(pixelValue)*PW3;
-        pW4_X = pX_W4(pixelValue)*PW4;
-        pW5_X = pX_W5(pixelValue)*PW5;
+function segmentedImage = SegmentarImagen(Img, pX_W1, pX_W2, pX_W3, pX_W4, pX_W5, PW1, PW2, PW3, PW4, PW5)
+    imgsz = size(Img);
 
-        [~, maxIdx] = max([pW1_X, pW2_X, pW3_X, pW4_X, pW5_X]); %~ ignora (descarta) el valor máximo; solo te quedas con maxIdx
-        segmentedImage(x, y) = maxIdx; % Asigna el número de la clase a la que pertenece basado en la maxima probabilidad
+    for x = 1:imgsz(1)
+        % Process each pixel in the image for segmentation
+        for y = 1:imgsz(2)
+            pixelValue = Img(x, y, :);
+            % calculando pWi_X para cada pixel
+            pW1_X = pX_W1(pixelValue)*PW1;
+            pW2_X = pX_W2(pixelValue)*PW2;
+            pW3_X = pX_W3(pixelValue)*PW3;
+            pW4_X = pX_W4(pixelValue)*PW4;
+            pW5_X = pX_W5(pixelValue)*PW5;
+
+            [~, maxIdx] = max([pW1_X, pW2_X, pW3_X, pW4_X, pW5_X]); %~ ignora (descarta) el valor máximo; solo te quedas con maxIdx
+            segmentedImage(x, y) = maxIdx; % Asigna el número de la clase a la que pertenece basado en la maxima probabilidad
+        end
     end
 end
+
+segmentedImageResult = SegmentarImagen(I, pX_W1, pX_W2, pX_W3, pX_W4, pX_W5, PW1, PW2, PW3, PW4, PW5);
+
+
+%TERCERA PARTE:Segmentación Iterativa
+% -------------------------------------------
+
+%6.- Emplea el resultado de la presegmentación para actualizar
+%probabilidades P(Wi)
+
+%Calculando nuevos valores PWi
+function new_PW = calculateNewPW(preSegmentation)
+    for n = 1:5
+        classImage = preSegmentation == n;
+        new_PW(n) = mean(classImage(:));
+    end
+end
+
+PWi = calculateNewPW(segmentedImageResult)
+
+%Repite el proceso de segmentación (Punto 5), las funciones condicionales
+%(Punto 4) no cambian
+segmentedResult1 = SegmentarImagen(I, pX_W1, pX_W2, pX_W3, pX_W4, pX_W5, PWi(1), PWi(2), PWi(3), PWi(4), PWi(5));
+
+% 7.- Repite 4 veces más el proceso de segmentación (punto 5). Determina el porcentaje de pixeles que cambian de clase entre los resultados de (presegmentación, 1ª segmentación), (1ª segmentación, 2ª segmentación),…(4ª segmentación, 5ª segmentación). Presenta las probabilidades P(Wi) y los porcentajes de cambio en una tabla. 
+P1Wi = calculateNewPW(segmentedResult1);
+segmentedResult2 = SegmentarImagen(I, pX_W1, pX_W2, pX_W3, pX_W4, pX_W5, P1Wi(1), P1Wi(2), P1Wi(3), P1Wi(4), P1Wi(5));
+
+P2Wi = calculateNewPW(segmentedResult2);
+segmentedResult3 = SegmentarImagen(I, pX_W1, pX_W2, pX_W3, pX_W4, pX_W5, P2Wi(1), P2Wi(2), P2Wi(3), P2Wi(4), P2Wi(5));
+
+P3Wi = calculateNewPW(segmentedResult3);
+segmentedResult4 = SegmentarImagen(I, pX_W1, pX_W2, pX_W3, pX_W4, pX_W5, P3Wi(1), P3Wi(2), P3Wi(3), P3Wi(4), P3Wi(5));
+
+P4Wi = calculateNewPW(segmentedResult4);
+segmentedResult5 = SegmentarImagen(I, pX_W1, pX_W2, pX_W3, pX_W4, pX_W5, P4Wi(1), P4Wi(2), P4Wi(3), P4Wi(4), P4Wi(5));
+
+
+
+
+levels = uint8([meanValues(1) meanValues(2) meanValues(3) meanValues(4) meanValues(5)]);     % 5 niveles de gris
+preseg = zeros(size(segmentedImageResult),'uint8');
+seg1 = zeros(size(segmentedResult1),'uint8');
+seg2 = zeros(size(segmentedResult2),'uint8');
+seg3 = zeros(size(segmentedResult3),'uint8');
+seg4 = zeros(size(segmentedResult4),'uint8');
+seg5 = zeros(size(segmentedResult5),'uint8');
+
+for r = 1:5
+    preseg(segmentedImageResult == r) = levels(r);
+    seg1(segmentedResult1 == r) = levels(r);
+    seg2(segmentedResult2 == r) = levels(r);
+    seg3(segmentedResult3 == r) = levels(r);
+    seg4(segmentedResult4 == r) = levels(r);
+    seg5(segmentedResult5 == r) = levels(r);
+end
+
+figure;
+tiledlayout(2,3,'TileSpacing','compact','Padding','compact');  % 1 fila, 5 columnas
+nexttile; imshow(preseg); title('Presegmentación');
+nexttile; imshow(seg1); title('Primera segmentación clase %d', k);
+nexttile; imshow(seg2); title('Segunda segmentación clase %d', k');
+nexttile; imshow(seg3); title('Tercera segmentación clase %d', k');
+nexttile; imshow(seg4); title('Cuarta segmentación clase %d', k');
+nexttile; imshow(seg5); title('Quinta segmentación clase %d', k');
+
+
+
 
 
 
 figure; imshow(I);
 
-
 k = 1;  % clase a inspeccionar
-figure; imshow(segmentedImage == k);
-title(sprintf('Máscara de la clase %d', k));
+
+figure;
+tiledlayout(2,3,'TileSpacing','compact','Padding','compact');  % 1 fila, 5 columnas
+nexttile; imshow(segmentedImageResult == k); title('Presegmentación');
+nexttile; imshow(segmentedResult1 == k); title('Primera segmentación clase %d', k);
+nexttile; imshow(segmentedResult2 == k); title('Segunda segmentación clase %d', k');
+nexttile; imshow(segmentedResult3 == k); title('Tercera segmentación clase %d', k');
+nexttile; imshow(segmentedResult4 == k); title('Cuarta segmentación clase %d', k');
+nexttile; imshow(segmentedResult5 == k); title('Quinta segmentación clase %d', k');
 
 k = 2;  % clase a inspeccionar
-figure; imshow(segmentedImage == k);
-title(sprintf('Máscara de la clase %d', k));
+figure;
+tiledlayout(2,3,'TileSpacing','compact','Padding','compact');  % 1 fila, 5 columnas
+nexttile; imshow(segmentedImageResult == k); title('Presegmentación');
+nexttile; imshow(segmentedResult1 == k); title('Primera segmentación clase %d', k);
+nexttile; imshow(segmentedResult2 == k); title('Segunda segmentación clase %d', k');
+nexttile; imshow(segmentedResult3 == k); title('Tercera segmentación clase %d', k');
+nexttile; imshow(segmentedResult4 == k); title('Cuarta segmentación clase %d', k');
+nexttile; imshow(segmentedResult5 == k); title('Quinta segmentación clase %d', k');
+
 
 k = 3;  % clase a inspeccionar
-figure; imshow(segmentedImage == k);
-title(sprintf('Máscara de la clase %d', k));
+figure;
+tiledlayout(2,3,'TileSpacing','compact','Padding','compact');  % 1 fila, 5 columnas
+nexttile; imshow(segmentedImageResult == k); title('Presegmentación');
+nexttile; imshow(segmentedResult1 == k); title('Primera segmentación clase %d', k);
+nexttile; imshow(segmentedResult2 == k); title('Segunda segmentación clase %d', k');
+nexttile; imshow(segmentedResult3 == k); title('Tercera segmentación clase %d', k');
+nexttile; imshow(segmentedResult4 == k); title('Cuarta segmentación clase %d', k');
+nexttile; imshow(segmentedResult5 == k); title('Quinta segmentación clase %d', k');
+
 
 k = 4;  % clase a inspeccionar
-figure; imshow(segmentedImage == k);
-title(sprintf('Máscara de la clase %d', k));
+figure;
+tiledlayout(2,3,'TileSpacing','compact','Padding','compact');  % 1 fila, 5 columnas
+nexttile; imshow(segmentedImageResult == k); title('Presegmentación');
+nexttile; imshow(segmentedResult1 == k); title('Primera segmentación clase %d', k);
+nexttile; imshow(segmentedResult2 == k); title('Segunda segmentación clase %d', k');
+nexttile; imshow(segmentedResult3 == k); title('Tercera segmentación clase %d', k');
+nexttile; imshow(segmentedResult4 == k); title('Cuarta segmentación clase %d', k');
+nexttile; imshow(segmentedResult5 == k); title('Quinta segmentación clase %d', k');
+
 
 k = 5;  % clase a inspeccionar
-figure; imshow(segmentedImage == k);
-title(sprintf('Máscara de la clase %d', k));
+figure;
+tiledlayout(2,3,'TileSpacing','compact','Padding','compact');  % 1 fila, 5 columnas
+nexttile; imshow(segmentedImageResult == k); title('Presegmentación');
+nexttile; imshow(segmentedResult1 == k); title('Primera segmentación clase %d', k);
+nexttile; imshow(segmentedResult2 == k); title('Segunda segmentación clase %d', k');
+nexttile; imshow(segmentedResult3 == k); title('Tercera segmentación clase %d', k');
+nexttile; imshow(segmentedResult4 == k); title('Cuarta segmentación clase %d', k');
+nexttile; imshow(segmentedResult5 == k); title('Quinta segmentación clase %d', k');
+
 
